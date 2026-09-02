@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ESTO Arkis · Versova locality map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<style>
+  html, body { margin: 0; height: 100%; background: #FFFFFF; font-family: Jost, system-ui, sans-serif; }
+  #map { position: absolute; inset: 0; background: #FFFFFF; }
+  .leaflet-container { background: #FFFFFF; }
+  .leaflet-tile-pane { filter: grayscale(1) brightness(1.09) contrast(.92); }
+  .leaflet-control-attribution { font-size: 8px; letter-spacing: .04em; background: rgba(255,255,255,.82); color: #4a5b66; }
+  .leaflet-control-attribution a { color: #C0704A; }
+  .leaflet-bar a { color: #0B2940; }
+  .pin { position: relative; }
+  .pin i { display: block; width: 7px; height: 7px; border-radius: 50%; background: #C0704A; box-shadow: 0 0 0 2px #fff; transition: transform .5s cubic-bezier(.16,1,.3,1), background .5s; }
+  .pin b { position: absolute; left: 12px; top: -4px; white-space: nowrap; font-size: 9px; font-weight: 400; letter-spacing: .1em; text-transform: uppercase; color: #0B2940; background: rgba(255,255,255,.86); padding: 2px 5px; opacity: 0; transition: opacity .5s cubic-bezier(.16,1,.3,1); }
+  .pin.on i { transform: scale(1.45); }
+  .pin.on b { opacity: 1; }
+  .pin.off i { background: #9fb0bb; }
+  .site { position: relative; }
+  .site i { display: block; width: 13px; height: 13px; border-radius: 50%; background: #C0704A; box-shadow: 0 0 0 3px #fff, 0 0 0 4px rgba(192,112,74,.35); }
+  .site span { position: absolute; left: 50%; top: -22px; transform: translateX(-50%); white-space: nowrap; font-size: 9.5px; letter-spacing: .22em; text-transform: uppercase; color: #0B2940; background: #fff; padding: 3px 7px; border: 1px solid rgba(192,112,74,.5); }
+  .site em { position: absolute; left: 50%; top: 50%; width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px; border-radius: 50%; border: 1px solid #C0704A; animation: ring 2.8s cubic-bezier(.16,1,.3,1) infinite; }
+  @keyframes ring { 0%,100% { transform: scale(1); opacity: .6; } 50% { transform: scale(2.6); opacity: 0; } }
+</style>
+</head>
+<body>
+<div id="map" role="img" aria-label="Map of ESTO Arkis and nearby landmarks in Versova, Andheri West"></div>
+<script>
+  var SITE = [19.1345, 72.8180];
+  var POINTS = [
+    ['schools', "St. Mary's High School", 19.1361, 72.8203],
+    ['schools', 'Jankidevi School', 19.1289, 72.8322],
+    ['schools', 'RIMS International School', 19.1402, 72.8252],
+    ['hospitals', 'Aashna Nursing Home', 19.1352, 72.8192],
+    ['hospitals', 'Kokilaben Dhirubhai Ambani Hospital', 19.1305, 72.8256],
+    ['hospitals', 'Gandhi Nursing Home', 19.1331, 72.8271],
+    ['malls', 'Infinity Mall', 19.1367, 72.8317],
+    ['malls', 'Fun Republic Mall', 19.1386, 72.8341],
+    ['malls', 'City Mall', 19.1347, 72.8331],
+    ['gardens', 'SVP Garden', 19.1338, 72.8166],
+    ['gardens', 'Chacha Nehru Garden', 19.1291, 72.8232],
+    ['business', 'Nirlon Knowledge Park', 19.1521, 72.8692],
+    ['business', 'Seepz', 19.1291, 72.8722],
+    ['connectivity', 'Andheri Railway Station', 19.1197, 72.8464],
+    ['connectivity', 'Western Express Highway', 19.1231, 72.8561],
+    ['metro', 'Versova Metro', 19.1290, 72.8213],
+    ['metro', 'D. N. Nagar Metro', 19.1244, 72.8318]
+  ];
+
+  var map = L.map('map', { zoomControl: true, scrollWheelZoom: false, attributionControl: true })
+    .setView([19.1330, 72.8330], 13);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 18
+  }).addTo(map);
+
+  L.marker(SITE, { icon: L.divIcon({ className: '', iconSize: [13, 13], iconAnchor: [6, 6],
+    html: '<span class="site"><i></i><em></em><span>ESTO Arkis</span></span>' }), zIndexOffset: 900, keyboard: false })
+    .addTo(map);
+
+  var markers = POINTS.map(function (p) {
+    var m = L.marker([p[2], p[3]], {
+      icon: L.divIcon({ className: '', iconSize: [7, 7], iconAnchor: [3, 3],
+        html: '<span class="pin"><i></i><b>' + p[1] + '</b></span>' }),
+      title: p[1], alt: p[1]
+    }).addTo(map);
+    m._cat = p[0];
+    return m;
+  });
+
+  function setCat(cat) {
+    curCat = cat;
+    markers.forEach(function (m) {
+      var el = m.getElement() && m.getElement().querySelector('.pin');
+      if (!el) return;
+      var on = m._cat === cat;
+      el.className = 'pin ' + (on ? 'on' : 'off');
+      m.setZIndexOffset(on ? 500 : 0);
+    });
+    var pts = markers.filter(function (m) { return m._cat === cat; }).map(function (m) { return m.getLatLng(); });
+    if (pts.length && sized()) map.fitBounds(L.latLngBounds(pts.concat([L.latLng(SITE)])).pad(0.28), { animate: true, duration: 1.1 });
+  }
+
+  window.addEventListener('message', function (e) {
+    var d = e.data || {};
+    if (d.type === 'arkis-map-cat' && typeof d.cat === 'string') setCat(d.cat);
+  });
+
+  var curCat = 'schools';
+  function sized() { var s = map.getSize(); return s.x > 0 && s.y > 0; }
+  function resize() {
+    map.invalidateSize();
+    if (map.getZoom() < 11) map.setView([19.1330, 72.8330], 13);
+    setCat(curCat);
+  }
+  if (window.ResizeObserver) {
+    var seen = false;
+    new ResizeObserver(function () {
+      var el = document.getElementById('map');
+      var ok = el.clientWidth > 0 && el.clientHeight > 0;
+      if (ok && !seen) { seen = true; resize(); }
+      else if (ok) map.invalidateSize();
+    }).observe(document.getElementById('map'));
+  }
+  window.addEventListener('load', function () { if (!sized()) resize(); else map.invalidateSize(); });
+  window.addEventListener('resize', function () { map.invalidateSize(); });
+  map.whenReady(function () { setTimeout(resize, 220); });
+</script>
+</body>
+</html>
