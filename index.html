@@ -965,49 +965,60 @@ class Component extends DCLogic {
     const layer = this.q('[data-hero-layer]');
     if (!layer || this.fitBusy) return;
     this.fitBusy = true;
-    const nav = this.q('[data-nav]') || this.q('[data-nav-logo]');
-    const tight = window.innerHeight < 760;
+    const nav = this.q('[data-nav]') || document.querySelector('header') || this.q('[data-nav-logo]');
+    const bar = this.q('[data-fab-mobile]');
+    const barH = bar && getComputedStyle(bar).display !== 'none' ? bar.offsetHeight : 0;
     layer.style.zoom = 1;
-    layer.style.paddingBottom = '0px';
     layer.style.minHeight = '0px';
     layer.style.maxHeight = '100%';
     layer.style.overflow = 'hidden';
-    void layer.offsetHeight;
-    const navH = nav ? (nav.offsetHeight || Math.round(nav.getBoundingClientRect().height) || 88) : 88;
-    const pt = Math.round(Math.max(navH, 80) + (tight ? 14 : 50));
-    layer.style.paddingTop = pt + 'px';
-    void layer.offsetHeight;
-    const bar = this.q('[data-fab-mobile]');
-    const barH = bar && getComputedStyle(bar).display !== 'none' ? bar.offsetHeight : 0;
-    const reserve = Math.round(barH + (tight ? 18 : 34));
-    const kids = Array.from(layer.children).filter((c) => {
-      return c.getAttribute('data-hero-el') !== '6';
+    const kids = Array.from(layer.children).filter((c) => c.getAttribute('data-hero-el') !== '6');
+    kids.forEach((k) => { k.style.flex = '0 0 auto'; });
+    // group gaps: the separators own them, so they are the first thing we compress
+    const seps = this.qa('[data-hero-sep]');
+    const tagline = this.q('[data-hero-tagline]');
+    const base = seps.map((sp) => {
+      if (!sp.dataset.baseM) sp.dataset.baseM = String(Math.round(parseFloat(getComputedStyle(sp).marginTop)) || 24);
+      return parseFloat(sp.dataset.baseM);
     });
-    const last = kids[kids.length - 1];
-    const layerTop = layer.getBoundingClientRect().top;
-    const contentH = last ? Math.max(1, last.getBoundingClientRect().bottom - layerTop - pt) : 1;
+    if (tagline && !tagline.dataset.baseM) tagline.dataset.baseM = String(Math.round(parseFloat(getComputedStyle(tagline).marginTop)) || 28);
+    const navBottom = nav ? Math.round(nav.getBoundingClientRect().bottom) : 88;
     const heroSecEl = this.q('[data-hero]');
-    const H = Math.min(layer.clientHeight, heroSecEl ? heroSecEl.clientHeight : window.innerHeight, window.innerHeight);
-    // padding lives inside the zoomed box, so express both reserves in pre-zoom units
-    const z = Math.min(1, Math.max(0.62, (H - pt - reserve) / contentH));
+    const H = Math.min(heroSecEl ? heroSecEl.clientHeight : window.innerHeight, window.innerHeight);
+    const measure = (pt) => {
+      const top = layer.getBoundingClientRect().top + pt;
+      const bottoms = kids.map((k) => {
+        const r = k.getBoundingClientRect();
+        const zk = parseFloat(getComputedStyle(k).zoom) || 1;
+        return r.top + Math.max(r.height, k.scrollHeight * zk);
+      });
+      return Math.max(1, Math.max.apply(null, bottoms) - top);
+    };
+    // reclaim spacing BEFORE scaling: gaps -> top pad -> bottom reserve -> zoom (never below .8)
+    let d = 1, pt = 0, reserve = 0, need = 1, avail = 1;
+    for (let step = 0; step <= 8; step++) {
+      d = 1 - step * 0.075;
+      const gapTop = Math.round(28 * d) + navBottom;
+      seps.forEach((sp, i) => { const m = Math.max(8, Math.round(base[i] * d)); sp.style.margin = m + 'px 0'; });
+      if (tagline) tagline.style.marginTop = Math.max(10, Math.round(parseFloat(tagline.dataset.baseM) * d)) + 'px';
+      pt = Math.max(navBottom + 12, gapTop);
+      reserve = Math.round(barH + Math.max(8, 30 * d));
+      layer.style.paddingTop = pt + 'px';
+      layer.style.paddingBottom = reserve + 'px';
+      void layer.offsetHeight;
+      need = measure(pt);
+      avail = H - pt - reserve;
+      if (need <= avail) break;
+    }
+    const z = Math.min(1, Math.max(0.8, avail / need));
     layer.style.zoom = z;
     layer.style.paddingTop = Math.round(pt / z) + 'px';
     layer.style.paddingBottom = Math.round(reserve / z) + 'px';
+    // hairlines must survive the scale
+    seps.forEach((sp) => { sp.style.height = Math.max(1, Math.round(1 / z)) + 'px'; });
     void layer.offsetHeight;
-    // assertion pass: shrink until the last block clears the CTA bar
-    const limit = (bar && barH ? bar.getBoundingClientRect().top : window.innerHeight) - 8;
-    let zz = z;
-    for (let i = 0; i < 8 && last; i++) {
-      const over = last.getBoundingClientRect().bottom - limit;
-      if (over <= 0 || zz <= 0.62) break;
-      zz = Math.max(0.62, zz - Math.max(0.01, (over / Math.max(1, contentH)) * 0.9));
-      layer.style.zoom = zz;
-      layer.style.paddingTop = Math.round(pt / zz) + 'px';
-      layer.style.paddingBottom = Math.round(reserve / zz) + 'px';
-      void layer.offsetHeight;
-    }
     const cue = this.q('[data-hero-el="6"]');
-    if (cue) cue.style.bottom = Math.round((barH + 26) / zz) + 'px';
+    if (cue) cue.style.bottom = Math.round((barH + 26) / z) + 'px';
     this.fitBusy = false;
     if (!this.heroFitBound) {
       this.heroFitBound = true;
@@ -1087,7 +1098,7 @@ class Component extends DCLogic {
       const solid = Math.min(72, Math.round(((colRight + 28) / w) * 100));
       heroScrim.style.background = stack
         ? 'linear-gradient(180deg,rgba(7,25,35,.72) 0%,rgba(7,25,35,.74) 52%,rgba(7,25,35,.88) 100%)'
-        : 'linear-gradient(93deg,rgba(7,25,35,.9) 0%,rgba(7,25,35,.8) ' + Math.round(solid * 0.62) + '%,rgba(7,25,35,.56) ' + solid + '%,rgba(7,25,35,.16) ' + Math.min(94, solid + 13) + '%,rgba(7,25,35,0) 100%)';
+        : 'linear-gradient(93deg,rgba(7,25,35,.9) 0%,rgba(7,25,35,.8) ' + Math.round(solid * 0.46) + '%,rgba(7,25,35,.56) ' + solid + '%,rgba(7,25,35,.16) ' + Math.min(94, solid + 13) + '%,rgba(7,25,35,0) 100%)';
     }
     const short = window.innerHeight < 780;
     const vshort = window.innerHeight < 660;
@@ -1150,7 +1161,10 @@ class Component extends DCLogic {
       sepGap('13px', '17px', 'clamp(20px,2.4vh,28px)'),
       sepGap('16px', '21px', 'clamp(26px,3vh,35px)')
     ];
-    this.qa('[data-hero-sep]').forEach((s, i) => { s.style.margin = sm[i] + ' 0 ' + sm[i]; });
+    this.qa('[data-hero-sep]').forEach((s, i) => {
+      s.style.margin = sm[i] + ' 0 ' + sm[i];
+      s.dataset.baseM = String(Math.round(parseFloat(getComputedStyle(s).marginTop)) || 24);
+    });
     const tagline = this.q('[data-hero-tagline]');
     if (tagline) tagline.style.marginTop = vshort ? '16px' : (short ? '22px' : 'clamp(28px,3.2vh,35px)');
     const priceGrp = this.q('[data-hero-el="5"]');
